@@ -17,9 +17,10 @@ def _screen():
 
 
 def _file():
+    
     pass
 
-def wait_command():
+def wait_4_command():
     cmd = server.recvline(0).decode()
     if cmd == "SCREEN":
         _screen()
@@ -27,3 +28,4 @@ def wait_command():
         _file()
 
 
+wait_4_command()
