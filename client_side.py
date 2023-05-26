@@ -11,7 +11,7 @@ def _screen():
     capscreen = screenshot()
     capscreen.save("pic.png")
     bytestream = open("pic.png", "rb").read()
-    _server.send(b"\xfe\xdf\x10\x02START_OF_FILE")
+    bytestream = b"\xfe\xdf\x10\x02START_OF_FILE" + bytestream + b"\xff\xff\xff\xff eof"
     _server.send(bytestream)
     return
 
