@@ -44,7 +44,6 @@ typedef struct connection {
     uint64_t signature;
     uint32_t filefd;
     uint8_t isFileTransferring;
-    uint8_t isScreencapTransferring;
     char containedFolder[0x100];
 } connection;
 
