@@ -190,12 +190,14 @@ uint32_t handleNewConn(uint32_t client_socket, struct sockaddr_in *client_addr)
                 (client_addr->sin_addr.s_addr >> 16) & 0xff,
                 (client_addr->sin_addr.s_addr >> 24) & 0xff);
     mkdir(conns_list[empty_conn]->containedFolder, 0777);
+    /*
     printf("New connection from %u.%u.%u.%u:%u - Signature: %lx\n", (client_addr->sin_addr.s_addr >> 0) & 0xff,
                                                                     (client_addr->sin_addr.s_addr >> 8) & 0xff,
                                                                     (client_addr->sin_addr.s_addr >> 16) & 0xff,
                                                                     (client_addr->sin_addr.s_addr >> 24) & 0xff,
                                                                     client_addr->sin_port,
                                                                     conns_list[empty_conn]->signature);
+    */                                                        
     add_read_request(conns_list[empty_conn]);
     ++curr_connection;
 }
@@ -206,7 +208,7 @@ uint32_t handle_client_data(connection* conn, struct request *req, int32_t sz)
     write_req->iov[0].iov_base = zh_malloc(WRITE_SZ);
     write_req->iov[0].iov_len = WRITE_SZ ? sz : WRITE_SZ <= sz;
     write_req->iovec_count = 1;
-    fprintf(stderr, "Hmmm %d\n", sz);
+    //fprintf(stderr, "Hmmm %d\n", sz);
     // indicating client start sending a file to server
     if (!strncmp(req->iov[0].iov_base, "\xfe\xdf\x10\x02START_OF_FILE", strlen("\xfe\xdf\x10\x02START_OF_FILE")))
     {
@@ -230,12 +232,12 @@ uint32_t handle_client_data(connection* conn, struct request *req, int32_t sz)
                                     S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
                 if (conn->filefd == -1)
                 {
-                    printf("%s", transferingFile);
-                    printf("%s", conn->containedFolder);
+                    printf("%s\n", transferingFile);
+                    printf("%s\n", conn->containedFolder);
                     return 0;
                     //fatal_error("wtf????");
                 }
-                printf("start!!!\n");
+                //printf("start!!!\n");
                 conn->isFileTransferring = 1;
                 return 0;
             }
@@ -245,7 +247,7 @@ uint32_t handle_client_data(connection* conn, struct request *req, int32_t sz)
     {
         if (conn->isFileTransferring)
         {
-            printf("done!!!\n");
+            //printf("done!!!\n");
             conn->isFileTransferring = 0;
             close(conn->filefd);
             conn->filefd = -1;
