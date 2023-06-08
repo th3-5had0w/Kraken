@@ -289,8 +289,6 @@ void server_loop(int server_socket) {
             exit(1);
         }
 
-        //fetch_cmd();
-
         switch (req->event_type) {
             case EVENT_TYPE_ACCEPT:
                 // add mutex lock right here
