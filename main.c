@@ -11,7 +11,6 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 
-#define SERVER_STRING           "Server: zerohttpd/0.1\r\n"
 #define DEFAULT_SERVER_PORT     8000
 #define QUEUE_DEPTH             256
 #define READ_SZ                 4096
@@ -158,31 +157,6 @@ int add_write_request(struct request *req) {
     return 0;
 }
 
-/*
- * Once a static file is identified to be served, this function is used to read the file
- * and write it over the client socket using Linux's sendfile() system call. This saves us
- * the hassle of transferring file buffers from kernel to user space and back.
- * */
-
-void copy_file_contents(char *file_path, off_t file_size, struct iovec *iov) {
-    int fd;
-
-    char *buf = zh_malloc(file_size);
-    fd = open(file_path, O_RDONLY);
-    if (fd < 0)
-        fatal_error("open");
-
-    /* We should really check for short reads here */
-    int ret = read(fd, buf, file_size);
-    if (ret < file_size) {
-        fprintf(stderr, "Encountered a short read.\n");
-    }
-    close(fd);
-
-    iov->iov_base = buf;
-    iov->iov_len = file_size;
-}
-
 int get_line(const char *src, char *dest, int dest_sz) {
     for (int i = 0; i < dest_sz; i++) {
         dest[i] = src[i];
@@ -216,18 +190,6 @@ uint32_t handleNewConn(uint32_t client_socket, struct sockaddr_in *client_addr)
                 (client_addr->sin_addr.s_addr >> 16) & 0xff,
                 (client_addr->sin_addr.s_addr >> 24) & 0xff);
     mkdir(conns_list[empty_conn]->containedFolder, 0777);
-    /*
-    snprintf(fileName, sizeof(fileName), "davy_jones_locker/%u.%u.%u.%u.txt", (client_addr->sin_addr.s_addr >> 0) & 0xff,
-                                                            (client_addr->sin_addr.s_addr >> 8) & 0xff,
-                                                            (client_addr->sin_addr.s_addr >> 16) & 0xff,
-                                                            (client_addr->sin_addr.s_addr >> 24) & 0xff);
-    uint32_t filefd = open(fileName, O_APPEND | O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-    if (filefd == -1)
-    {
-        return -1;
-    }
-    conns_list[empty_conn]->filefd = filefd;
-    */
     printf("New connection from %u.%u.%u.%u:%u - Signature: %lx\n", (client_addr->sin_addr.s_addr >> 0) & 0xff,
                                                                     (client_addr->sin_addr.s_addr >> 8) & 0xff,
                                                                     (client_addr->sin_addr.s_addr >> 16) & 0xff,
@@ -307,38 +269,6 @@ uint32_t handle_client_data(connection* conn, struct request *req, int32_t sz)
         return 0;
 }
 
-uint32_t fetch_cmd()
-{
-    char *loccmd = zh_malloc(0x20);
-    memset(loccmd, 0, 0x20);
-    switch (cmd)
-    {
-        case FILE:
-            memcpy(loccmd, "FILE", 4);
-            cmd = -1;
-            break;
-        case SCREEN:
-            memcpy(loccmd, "SCREEN", 6);
-            cmd = -1;
-            break;
-        default:
-            return 0;
-    }
-    for (uint64_t conn = 0; conn < MAX_CONN; ++conn)
-    {
-        if (conns_list[conn])
-        {
-            struct request *req = zh_malloc(sizeof(*req) + sizeof(struct iovec));
-            req->iov[0].iov_base = strndup(loccmd, strlen(loccmd));
-            req->iov[0].iov_len = strlen(loccmd);
-            req->iovec_count = 1;
-            req->client_socket = conns_list[conn]->sockfd;
-            add_write_request(req);            
-        }
-    }
-    return 0;
-}
-
 void server_loop(int server_socket) {
     struct io_uring_cqe *cqe;
     struct sockaddr_in client_addr;
@@ -368,6 +298,8 @@ void server_loop(int server_socket) {
                 free(req);
                 pthread_mutex_unlock(&mutex);
                 break;
+
+
             case EVENT_TYPE_READ:
                 if (!cqe->res) {
                     fprintf(stderr, "Client %lx closed connection\n", req->signature);
@@ -401,22 +333,22 @@ void server_loop(int server_socket) {
                             break;
                         }
                     }
-                    //add_read_request(conns_list[curr_connection]);
                 }
-                //handle_client_request(req);
-                //handle_client_request(conns_list[curr_connection], req);
                 free(req->iov[0].iov_base);
                 req->iov[0].iov_base = 0;
                 free(req);
                 break;
+
+
             case EVENT_TYPE_WRITE:
                 for (int i = 0; i < req->iovec_count; i++) {
                     free(req->iov[i].iov_base);
                     req->iov[i].iov_base = 0;
                 }
-                //close(req->client_socket);
                 free(req);
                 break;
+
+
         }
         /* Mark this request as processed */
         io_uring_cqe_seen(&ring, cqe);
