@@ -12,7 +12,7 @@
 #include <pthread.h>
 
 #define DEFAULT_SERVER_PORT     8000
-#define QUEUE_DEPTH             256
+#define QUEUE_DEPTH             1024
 #define READ_SZ                 4096
 #define WRITE_SZ                4096
 
@@ -42,22 +42,16 @@ typedef struct connection {
     uint32_t sockfd;
     uint64_t signature;
     uint32_t filefd;
+    clock_t start;
     uint8_t isFileTransferring;
     char containedFolder[0x100];
 } connection;
 
 struct io_uring ring;
+struct io_uring_params params;
 
 connection *conns_list[MAX_CONN];
 
-/*
- * Utility function to convert a string to lower case.
- * */
-
-void strtolower(char *str) {
-    for (; *str; ++str)
-        *str = (char)tolower(*str);
-}
 /*
  One function that prints the system call and the error details
  and then exits with error code 1. Non-zero meaning things didn't go well.
@@ -182,6 +176,7 @@ uint32_t handleNewConn(uint32_t client_socket, struct sockaddr_in *client_addr)
     conns_list[empty_conn]->filefd = -1;
     conns_list[empty_conn]->isFileTransferring = 0;
     conns_list[empty_conn]->signature = (ip << 16) | client_addr->sin_port;
+    conns_list[empty_conn]->start = 0;
     snprintf(conns_list[empty_conn]->containedFolder,
                 sizeof(conns_list[empty_conn]->containedFolder),
                 "davy_jones_locker/%u.%u.%u.%u",
@@ -239,6 +234,8 @@ uint32_t handle_client_data(connection* conn, struct request *req, int32_t sz)
                 }
                 //printf("start!!!\n");
                 conn->isFileTransferring = 1;
+                // start now!!!
+                conn->start = clock();
                 return 0;
             }
         }
@@ -248,6 +245,8 @@ uint32_t handle_client_data(connection* conn, struct request *req, int32_t sz)
         if (conn->isFileTransferring)
         {
             //printf("done!!!\n");
+            printf("Done in %.16f\n", (double)((double)(clock() - conn->start) / CLOCKS_PER_SEC));
+            conn->start = 0;
             conn->isFileTransferring = 0;
             close(conn->filefd);
             conn->filefd = -1;
@@ -273,12 +272,14 @@ uint32_t handle_client_data(connection* conn, struct request *req, int32_t sz)
 
 void server_loop(int server_socket) {
     struct io_uring_cqe *cqe;
+    int peek;
     struct sockaddr_in client_addr;
-    struct sockaddr_in a;
     socklen_t client_addr_len = sizeof(client_addr);
 
     add_accept_request(server_socket, &client_addr, &client_addr_len);
     while (1) {
+        //peek = io_uring_peek_cqe(&ring, &cqe);
+        //if (peek) continue;
         int ret = io_uring_wait_cqe(&ring, &cqe);
         if (ret < 0)
             fatal_error("io_uring_wait_cqe");
@@ -408,6 +409,9 @@ void *input(void *args)
 void init()
 {
     if (pthread_mutex_init(&mutex, NULL) != 0) fatal_error("pthread_mutex_init()");
+    params.flags |= IORING_SETUP_SQPOLL;
+    params.sq_thread_idle = 120000; // 2 minutes in ms
+    //io_uring_queue_init_params(QUEUE_DEPTH, &ring, &params);
 }
 
 void sigint_handler(int signo)
@@ -418,9 +422,10 @@ void sigint_handler(int signo)
 }
 
 int main() {
-    init();
-    int server_socket = setup_listening_socket(DEFAULT_SERVER_PORT);
     signal(SIGINT, sigint_handler);
+    if (geteuid()) fatal_error("You need root privileges to run this program.\n");
+    int server_socket = setup_listening_socket(DEFAULT_SERVER_PORT);
+    init();
     io_uring_queue_init(QUEUE_DEPTH, &ring, 0);
     pthread_create(&thread, NULL, &input, NULL);
     server_loop(server_socket);
