@@ -10,8 +10,22 @@ https://unixism.net/loti/tutorial/webserver_liburing.html
 
 This line was added to let you know that [d4rkn19ht](https://github.com/sinkthemall) did contribute to this repo :D
 
-# How to build
+# Prerequisites
 
 ```bash
-gcc main.c -luring -lpthread -O3 -o main
+sudo apt install liburing-dev
+```
+
+# Build
+
+```bash
+make
+```
+
+# Benchmark
+
+```bash
+make benchmark
+cd playground
+python3 benchmarker.py
 ```
