@@ -424,7 +424,7 @@ void sigint_handler(int signo)
 
 int main() {
     signal(SIGINT, sigint_handler);
-    if (geteuid()) fatal_error("You need root privileges to run this program.\n");
+    //if (geteuid()) fatal_error("You need root privileges to run this program.\n");
     int server_socket = setup_listening_socket(DEFAULT_SERVER_PORT);
     init();
     io_uring_queue_init(QUEUE_DEPTH, &ring, 0);
