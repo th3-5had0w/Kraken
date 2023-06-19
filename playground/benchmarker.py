@@ -1,24 +1,24 @@
 import socket
+import os
 import io
-from pwn import *
-from time import sleep, time_ns
 
 IP = '127.0.0.1'
-PORT = 8000
+PORT_FAST = 8001
+PORT_SLOW = 8002
 FILE = 'sample.txt'
 CHUNKSIZE = 4096
 
 def init():
-    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
-    client.connect((IP, PORT))
-    return client
+    client_fast = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+    client_fast.connect((IP, PORT_FAST))
+    client_slow = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+    client_slow.connect((IP, PORT_SLOW))
+    return (client_fast, client_slow)
 
 def _file(file, sock : socket.socket):
     f = os.open(file, os.O_RDONLY)
     finf = os.fstat(f)
     print(finf.st_size)
-    if file == 'client_side.py':
-        return
     with open(file, 'rb') as f:
         for _ in range((finf.st_size // CHUNKSIZE) + 1):
             sock.send(f.read(CHUNKSIZE))
@@ -26,8 +26,12 @@ def _file(file, sock : socket.socket):
 
 
 def main():
-    sock = init()
-    _file(FILE, sock)
+    sz = input("How much? ")
+    os.system("head -c {} /dev/urandom > {}".format(sz, FILE))
+    os.system("md5sum {}".format(FILE))
+    fast, slow = init()
+    _file(FILE, fast)
+    _file(FILE, slow)
 
 if __name__=='__main__':
     main()

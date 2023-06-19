@@ -12,14 +12,11 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 
-#define DEFAULT_SERVER_PORT     8000
-#define QUEUE_DEPTH             256
+#define DEFAULT_SERVER_PORT     8002
 #define READ_SZ                 4096
 #define WRITE_SZ                4096
 
 #define MAX_CONN    1024
-
-pthread_mutex_t mutex;
 
 /*
  One function that prints the system call and the error details
@@ -82,11 +79,6 @@ int setup_listening_socket(int port) {
     return (sock);
 }
 
-void init()
-{
-    if (pthread_mutex_init(&mutex, NULL) != 0) fatal_error("pthread_mutex_init()");
-}
-
 void sigint_handler(int signo)
 {
     printf("^C pressed. Shutting down.\n");
@@ -113,7 +105,7 @@ void server_loop(int server_socket)
         if (sz <= 0)
         {
             clock_gettime(CLOCK_MONOTONIC, &tend);
-            printf("some_long_computation took about %.10f seconds\n",
+            printf("[slow] took about %.10f seconds\n",
             ((double)tend.tv_sec + 1.0e-9*tend.tv_nsec) -
             ((double)tstart.tv_sec + 1.0e-9*tstart.tv_nsec));
             close(file_fd);

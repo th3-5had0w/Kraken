@@ -12,7 +12,7 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 
-#define DEFAULT_SERVER_PORT     8000
+#define DEFAULT_SERVER_PORT     8001
 #define QUEUE_DEPTH             1
 #define READ_SZ                 4096
 #define WRITE_SZ                4096
@@ -20,10 +20,7 @@
 #define EVENT_TYPE_READ         1
 #define EVENT_TYPE_WRITE        2
 
-#define MAX_CONN    1024
-
-
-pthread_mutex_t mutex;
+#define MAX_CONN    1
 
 typedef struct request {
     int event_type;
@@ -132,11 +129,6 @@ int add_write_request(struct request *req) {
     return 0;
 }
 
-void init()
-{
-    if (pthread_mutex_init(&mutex, NULL) != 0) fatal_error("pthread_mutex_init()");
-}
-
 void sigint_handler(int signo)
 {
     printf("^C pressed. Shutting down.\n");
@@ -180,7 +172,7 @@ void server_loop(int server_socket)
             case EVENT_TYPE_READ:
                 if (!cqe->res) {
                     clock_gettime(CLOCK_MONOTONIC, &tend);
-                    printf("some_long_computation took about %.10f seconds\n",
+                    printf("[fast] took about %.10f seconds\n",
                     ((double)tend.tv_sec + 1.0e-9*tend.tv_nsec) -
                     ((double)tstart.tv_sec + 1.0e-9*tstart.tv_nsec));
                     close(client_sock);
