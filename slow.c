@@ -88,6 +88,8 @@ void sigint_handler(int signo)
 void server_loop(int server_socket)
 {
     struct sockaddr_in client_addr;
+    uint8_t first = 1;
+    struct timespec tstart={0,0}, tend={0,0};
     socklen_t client_addr_len = sizeof(client_addr);
     int client = accept(server_socket, &client_addr, &client_addr_len);
     if (client < 0) fatal_error("accept()");
@@ -97,8 +99,6 @@ void server_loop(int server_socket)
     writeiov.iov_len = WRITE_SZ;
     int file_fd = open("slow.tmp", O_WRONLY | O_CREAT | O_TRUNC | O_APPEND,
                                     S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-    struct timespec tstart={0,0}, tend={0,0};
-    clock_gettime(CLOCK_MONOTONIC, &tstart);
     while (1)
     {
         uint32_t sz = readv(client, &readiov, 1);
@@ -110,6 +110,11 @@ void server_loop(int server_socket)
             ((double)tstart.tv_sec + 1.0e-9*tstart.tv_nsec));
             close(file_fd);
             break;
+        }
+        if (first)
+        {
+            first = 0;
+            clock_gettime(CLOCK_MONOTONIC, &tstart);
         }
         //printf("recved %d\n", sz);
         writeiov.iov_base = readiov.iov_base, WRITE_SZ ? sz : WRITE_SZ <= sz;

@@ -19,10 +19,11 @@ def _file(file, sock : socket.socket):
     f = os.open(file, os.O_RDONLY)
     finf = os.fstat(f)
     print(finf.st_size)
-    with open(file, 'rb') as f:
+    with open(file, 'rb') as fd:
         for _ in range((finf.st_size // CHUNKSIZE) + 1):
-            sock.send(f.read(CHUNKSIZE))
+            sock.send(fd.read(CHUNKSIZE))
     sock.close()
+    os.close(f)
 
 
 def main():

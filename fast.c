@@ -143,11 +143,13 @@ void server_loop(int server_socket)
     uint32_t peek;
     socklen_t client_addr_len = sizeof(client_addr);
     uint32_t client_sock;
+    uint8_t first = 1;
+    struct timespec tstart={0,0}, tend={0,0};
 
     add_accept_request(server_socket, &client_addr, &client_addr_len);
     while (1) {
-        peek = io_uring_peek_cqe(&ring, &cqe);
-        if (peek) continue;
+        //peek = io_uring_peek_cqe(&ring, &cqe);
+        //if (peek) continue;
         int ret = io_uring_wait_cqe(&ring, &cqe);
         if (ret < 0)
             fatal_error("io_uring_wait_cqe");
@@ -165,8 +167,6 @@ void server_loop(int server_socket)
                 file_fd = open("fast.tmp", O_WRONLY | O_CREAT | O_TRUNC | O_APPEND,
                                     S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
                 add_read_request(client_sock);
-                struct timespec tstart={0,0}, tend={0,0};
-                clock_gettime(CLOCK_MONOTONIC, &tstart);
                 break;
 
             case EVENT_TYPE_READ:
@@ -180,9 +180,15 @@ void server_loop(int server_socket)
                 }
                 else
                 {
+                    if (first)
+                    {
+                        first = 0;
+                        clock_gettime(CLOCK_MONOTONIC, &tstart);
+                    }
                     uint32_t sz = cqe->res;
                     struct request *write_req = zh_malloc(sizeof(*req) + sizeof(struct iovec));
-                    write_req->iov[0].iov_base = req->iov[0].iov_base;//zh_malloc(WRITE_SZ);
+                    write_req->iov[0].iov_base = req->iov[0].iov_base;
+                    //write_req->iov[0].iov_base = zh_malloc(WRITE_SZ);
                     write_req->iov[0].iov_len = WRITE_SZ ? sz : WRITE_SZ <= sz;
                     write_req->client_socket = file_fd;
                     write_req->iovec_count = 1;
