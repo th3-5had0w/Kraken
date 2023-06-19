@@ -97,24 +97,27 @@ void server_loop(int server_socket)
     struct sockaddr_in client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
     int client = accept(server_socket, &client_addr, &client_addr_len);
+    if (client < 0) fatal_error("accept()");
     struct iovec readiov, writeiov;
     readiov.iov_base = zh_malloc(READ_SZ);
     readiov.iov_len = READ_SZ;
-    readiov.iov_base = zh_malloc(WRITE_SZ);
-    readiov.iov_len = READ_SZ;
+    writeiov.iov_base = zh_malloc(WRITE_SZ);
+    writeiov.iov_len = READ_SZ;
     int file_fd = open("file.tmp", O_WRONLY | O_CREAT | O_TRUNC | O_APPEND,
                                     S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
     clock_t start = clock();                                    
     while (1)
     {
         uint32_t sz = readv(client, &readiov, 1);
-        if (sz == -1)
+        if (sz <= 0)
         {
             printf("Took %.16f\n", (double)((double)(clock() - start) / CLOCKS_PER_SEC));
             close(file_fd);
             break;
         }
+        //printf("recved %d\n", sz);
         memcpy(writeiov.iov_base, readiov.iov_base, WRITE_SZ ? sz : WRITE_SZ <= sz);
+        writeiov.iov_len = WRITE_SZ ? sz : WRITE_SZ <= sz;
         writev(file_fd, &writeiov, 1);
     }
 }

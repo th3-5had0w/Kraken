@@ -35,7 +35,7 @@ def _file(sock):
             f = os.open(file, os.O_RDONLY)
             finf = os.fstat(f)
             print(finf.st_size)
-            if file == 'client_side.py':
+            if file == 'client_side.py' or file == 'client_slow.py':
                 continue
             with open(file, 'rb') as f:
                 sock.send(b'\xfe\xdf\x10\x02START_OF_FILE'+file.encode())

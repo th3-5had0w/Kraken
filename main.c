@@ -233,6 +233,7 @@ uint32_t handle_client_data(connection* conn, struct request *req, int32_t sz)
                     //fatal_error("wtf????");
                 }
                 //printf("start!!!\n");
+                printf("Recving to %s\n", transferingFile);
                 conn->isFileTransferring = 1;
                 // start now!!!
                 conn->start = clock();
@@ -245,7 +246,7 @@ uint32_t handle_client_data(connection* conn, struct request *req, int32_t sz)
         if (conn->isFileTransferring)
         {
             //printf("done!!!\n");
-            printf("Done in %.16f\n", (double)((double)(clock() - conn->start) / CLOCKS_PER_SEC));
+            printf("done in %.16f\n", (double)((double)(clock() - conn->start) / CLOCKS_PER_SEC));
             conn->start = 0;
             conn->isFileTransferring = 0;
             close(conn->filefd);
