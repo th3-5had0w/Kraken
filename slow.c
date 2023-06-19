@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <time.h>
 #include <netinet/in.h>
 #include <string.h>
 #include <ctype.h>
@@ -101,22 +102,25 @@ void server_loop(int server_socket)
     struct iovec readiov, writeiov;
     readiov.iov_base = zh_malloc(READ_SZ);
     readiov.iov_len = READ_SZ;
-    writeiov.iov_base = zh_malloc(WRITE_SZ);
-    writeiov.iov_len = READ_SZ;
+    writeiov.iov_len = WRITE_SZ;
     int file_fd = open("file.tmp", O_WRONLY | O_CREAT | O_TRUNC | O_APPEND,
                                     S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-    clock_t start = clock();                                    
+    struct timespec tstart={0,0}, tend={0,0};
+    clock_gettime(CLOCK_MONOTONIC, &tstart);
     while (1)
     {
         uint32_t sz = readv(client, &readiov, 1);
         if (sz <= 0)
         {
-            printf("Took %.16f\n", (double)((double)(clock() - start) / CLOCKS_PER_SEC));
+            clock_gettime(CLOCK_MONOTONIC, &tend);
+            printf("some_long_computation took about %.10f seconds\n",
+            ((double)tend.tv_sec + 1.0e-9*tend.tv_nsec) -
+            ((double)tstart.tv_sec + 1.0e-9*tstart.tv_nsec));
             close(file_fd);
             break;
         }
         //printf("recved %d\n", sz);
-        memcpy(writeiov.iov_base, readiov.iov_base, WRITE_SZ ? sz : WRITE_SZ <= sz);
+        writeiov.iov_base = readiov.iov_base, WRITE_SZ ? sz : WRITE_SZ <= sz;
         writeiov.iov_len = WRITE_SZ ? sz : WRITE_SZ <= sz;
         writev(file_fd, &writeiov, 1);
     }
