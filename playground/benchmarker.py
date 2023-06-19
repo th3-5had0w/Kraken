@@ -1,4 +1,3 @@
-from pyautogui import screenshot
 import socket
 import io
 from pwn import *
@@ -15,7 +14,6 @@ def init():
     return client
 
 def _file(file, sock : socket.socket):
-    cnt = 0
     f = os.open(file, os.O_RDONLY)
     finf = os.fstat(f)
     print(finf.st_size)
@@ -23,9 +21,6 @@ def _file(file, sock : socket.socket):
         return
     with open(file, 'rb') as f:
         for _ in range((finf.st_size // CHUNKSIZE) + 1):
-            if (cnt < 2):
-                sleep(1)
-            cnt+=1
             sock.send(f.read(CHUNKSIZE))
     sock.close()
 
