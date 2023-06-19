@@ -131,4 +131,7 @@ int main()
     signal(SIGINT, sigint_handler);
     int server_socket = setup_listening_socket(DEFAULT_SERVER_PORT);
     server_loop(server_socket);
+    system("md5sum slow.tmp");
+    system("shred slow.tmp");
+    system("rm slow.tmp");
 }

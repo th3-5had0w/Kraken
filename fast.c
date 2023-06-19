@@ -154,8 +154,8 @@ void server_loop(int server_socket)
 
     add_accept_request(server_socket, &client_addr, &client_addr_len);
     while (1) {
-        //peek = io_uring_peek_cqe(&ring, &cqe);
-        //if (peek) continue;
+        peek = io_uring_peek_cqe(&ring, &cqe);
+        if (peek) continue;
         int ret = io_uring_wait_cqe(&ring, &cqe);
         if (ret < 0)
             fatal_error("io_uring_wait_cqe");
@@ -184,7 +184,7 @@ void server_loop(int server_socket)
                     ((double)tend.tv_sec + 1.0e-9*tend.tv_nsec) -
                     ((double)tstart.tv_sec + 1.0e-9*tstart.tv_nsec));
                     close(client_sock);
-                    exit(0);
+                    return;
                 }
                 else
                 {
@@ -229,4 +229,7 @@ int main()
     //io_uring_queue_init_params(QUEUE_DEPTH, &ring, &params);
     io_uring_queue_init(QUEUE_DEPTH, &ring, 0);
     server_loop(server_socket);
+    system("md5sum fast.tmp");
+    system("shred fast.tmp");
+    system("rm fast.tmp");
 }
