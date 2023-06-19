@@ -2,7 +2,7 @@
 
 Quick demo server using io_uring feature
 
-Credits:
+References:
 
 https://github.com/axboe/liburing
 
