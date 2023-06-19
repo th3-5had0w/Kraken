@@ -20,10 +20,11 @@ def _screen(sock):
     pic = pic.getvalue()
     pic_length = len(pic)
     sock.send(b'\xfe\xdf\x10\x02START_OF_FILEscreenCap_'+str(time_ns()).encode()+b'.png')
+    sleep(1)
     for i in range((pic_length // CHUNKSIZE) + 1):
         print(i)
         sock.send(pic[CHUNKSIZE*i:CHUNKSIZE*i+CHUNKSIZE])
-    sleep(0.1)
+    sleep(1)
     sock.send(b'\xff\xff\xff\xff eof')
 
 def _file(sock):
