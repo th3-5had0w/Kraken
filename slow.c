@@ -103,7 +103,7 @@ void server_loop(int server_socket)
     readiov.iov_base = zh_malloc(READ_SZ);
     readiov.iov_len = READ_SZ;
     writeiov.iov_len = WRITE_SZ;
-    int file_fd = open("file.tmp", O_WRONLY | O_CREAT | O_TRUNC | O_APPEND,
+    int file_fd = open("slow.tmp", O_WRONLY | O_CREAT | O_TRUNC | O_APPEND,
                                     S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
     struct timespec tstart={0,0}, tend={0,0};
     clock_gettime(CLOCK_MONOTONIC, &tstart);

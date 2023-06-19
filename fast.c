@@ -170,11 +170,11 @@ void server_loop(int server_socket)
             case EVENT_TYPE_ACCEPT:
                 client_sock = cqe->res;
                 free(req);
-                file_fd = open("file.tmp", O_WRONLY | O_CREAT | O_TRUNC | O_APPEND,
+                file_fd = open("fast.tmp", O_WRONLY | O_CREAT | O_TRUNC | O_APPEND,
                                     S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+                add_read_request(client_sock);
                 struct timespec tstart={0,0}, tend={0,0};
                 clock_gettime(CLOCK_MONOTONIC, &tstart);
-                add_read_request(client_sock);
                 break;
 
             case EVENT_TYPE_READ:
